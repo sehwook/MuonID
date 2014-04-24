@@ -10,8 +10,8 @@ process.source = cms.Source("PoolSource",
     # replace 'myfile.root' with the source file you want to use
     fileNames = cms.untracked.vstring(
         #'/store/relval/CMSSW_6_2_0_SLHC9/RelValZMM_14TeV/GEN-SIM-RECO/DES23_62_V1_UPG2023Muon-v1/00000/18BBFD9C-12AE-E311-983E-002618943833.root',
-        #'file:/afs/cern.ch/work/s/seh/private/MC_samples/upgrade2023/18BBFD9C-12AE-E311-983E-002618943833.root',
-        'file:/afs/cern.ch/work/s/seh/private/MC_samples/upgrade2023/1E87BA41-FDAD-E311-B614-0025905A6070.root'
+        'file:/afs/cern.ch/work/s/seh/private/MC_samples/upgrade2023/18BBFD9C-12AE-E311-983E-002618943833.root',
+        #'file:/afs/cern.ch/work/s/seh/private/MC_samples/upgrade2023/1E87BA41-FDAD-E311-B614-0025905A6070.root'
 
         #'root://xrootd.unl.edu//store/relval/CMSSW_6_2_0_SLHC9/RelValZMM_14TeV/GEN-SIM-RECO/DES23_62_V1_UPG2023Muon-v1/00000/18BBFD9C-12AE-E311-983E-002618943833.root',
         #'root://xrootd.unl.edu//store/relval/CMSSW_6_2_0_SLHC9/RelValZMM_14TeV/GEN-SIM-RECO/DES23_62_V1_UPG2023Muon-v1/00000/1E87BA41-FDAD-E311-B614-0025905A6070.root'
@@ -27,8 +27,13 @@ process.TFileService = cms.Service("TFileService",
 process.muonid = cms.EDAnalyzer('Identification_Reco',
                               pvTag = cms.InputTag("offlinePrimaryVertices",""),
                               muTag = cms.InputTag("muons",""),
+                              eTag = cms.InputTag("gsfElectrons",""),
                               jtTag = cms.InputTag("ak5PFJetsCHS",""),
-                              RhoTag = cms.InputTag("kt6PFJetsCentralNeutral","rho")
+                              RhoTag = cms.InputTag("kt6PFJetsCentralNeutral","rho"),
+                              PFJetID = cms.PSet(
+                                                 version = cms.string('FIRSTDATA'),
+                                                 quality = cms.string('LOOSE') 
+                                                ) 
 )
 
 
