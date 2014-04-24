@@ -47,7 +47,10 @@
 #include "DataFormats/MuonReco/interface/MuonSelectors.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "DataFormats/PatCandidates/interface/Isolation.h"
+#include "DataFormats/Math/interface/deltaR.h"
 
+/// Jet ID
+#include "PhysicsTools/SelectorUtils/interface/PFJetIDSelectionFunctor.h"
 
 //
 // class declaration
@@ -61,6 +64,7 @@ class Identification_Reco : public edm::EDAnalyzer {
 
    typedef std::vector<reco::Vertex> VertexCollection;
    typedef std::vector<reco::Muon> MuonCollection;
+   typedef std::vector<reco::GsfElectron> ElectronCollection;
    //typedef std::vector<reco::Jet> JetCollection;
    typedef std::vector<reco::PFJet> JetCollection;
 
@@ -84,22 +88,29 @@ class Identification_Reco : public edm::EDAnalyzer {
       // ----------member data ---------------------------
       void Book();
       void Reset();
+     
+      //rho correction
       void setEffectiveArea();
       double getEffectiveArea(double eta, double dr);
       
+      // Jet
+      bool recoPFJetID(const reco::PFJet & jet, string quality);
+
       // TFileService
       edm::Service<TFileService> muisofs;
       //Input Tag
       edm::InputTag vertexTag;
       edm::InputTag muonTag;
+      edm::InputTag electronTag;
       edm::InputTag jetTag;
       edm::InputTag rhoTag;
-
+      edm::ParameterSet pfJetIDparam;
 
     private:
 
       TTree* MuonID;
 
+      // muon variable containers
       std::vector<double> muons_Px;
       std::vector<double> muons_Py;
       std::vector<double> muons_Pz;
@@ -107,6 +118,7 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::vector<double> muons_eta;
       std::vector<double> muons_phi;
       std::vector<double> muons_pdgid;
+      std::vector<double> muons_et;
       std::vector<double> muons_energy;
       std::vector<double> muons_charge;
       std::vector<double> muons_trkIso03;
@@ -142,6 +154,7 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::map<double, double> map_muons_eta;
       std::map<double, double> map_muons_phi;
       std::map<double, double> map_muons_pdgid;
+      std::map<double, double> map_muons_et;
       std::map<double, double> map_muons_energy;
       std::map<double, double> map_muons_charge;
       std::map<double, double> map_muons_trkIso03;
@@ -171,6 +184,19 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::map<double, bool> map_muons_isFalseSoft;
       std::map<double, bool> map_muons_isFalseTight;
 
+      // Electron variable containers
+      std::vector<double> electrons_Pt;
+      std::vector<double> electrons_eta;
+      std::vector<double> electrons_phi;
+      std::vector<double> electrons_energy;
+      std::vector<double> electrons_et;
+      // To sort object in Pt descending order
+      std::map<double, double> map_electrons_eta;
+      std::map<double, double> map_electrons_phi;
+      std::map<double, double> map_electrons_energy;
+      std::map<double, double> map_electrons_et;
+   
+      // Jet variable containers
       std::vector<double> jets_Px;
       std::vector<double> jets_Py;
       std::vector<double> jets_Pz;
@@ -184,6 +210,10 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::vector<double> jets_isPFJet;
       std::vector<double> jets_pdgid;
       std::vector<double> jets_isJet;
+      std::vector<double> diff_jetE_muE;
+      std::vector<double> frac_muE_jetE;
+      std::vector<double> muPt_inJet;
+      std::vector<double> frac_eleE_jetE;
       //To sort object in Pt order
       std::map<double, double> map_jets_Px;
       std::map<double, double> map_jets_Py;
@@ -238,9 +268,16 @@ class Identification_Reco : public edm::EDAnalyzer {
       double effA03;
       double effA04;
 
+      // Electron
+      unsigned int N_electrons;
+
       /// Jet
+      bool jetid_pass;
+      bool jet_isMuon;
+      bool jet_iselectron;
       unsigned int NJets;
       double rho;
+      double dR;
 
       //Vertex
       double sumtrackptsquare;
@@ -260,8 +297,10 @@ class Identification_Reco : public edm::EDAnalyzer {
 Identification_Reco::Identification_Reco(const edm::ParameterSet& iConfig)
 :vertexTag( iConfig.getParameter<edm::InputTag>("pvTag") ),
  muonTag( iConfig.getParameter<edm::InputTag>("muTag") ),
+ electronTag( iConfig.getParameter<edm::InputTag>("eTag") ),
  jetTag( iConfig.getParameter<edm::InputTag>("jtTag") ),
- rhoTag( iConfig.getParameter<edm::InputTag>("RhoTag") )
+ rhoTag( iConfig.getParameter<edm::InputTag>("RhoTag") ),
+ pfJetIDparam( iConfig.getParameter<edm::ParameterSet> ("PFJetID") )
 {
    //now do what ever initialization is needed
    setEffectiveArea();
@@ -346,7 +385,7 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
    Handle<MuonCollection> muons;
    iEvent.getByLabel(muonTag, muons);
 
-   // fill electron branches
+   // fill muon branches
    for (MuonCollection::const_iterator itMu = muons->begin() ; itMu != muons->end(); itMu++)
    {
       isLoose = false;
@@ -420,6 +459,7 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       map_muons_eta[(*itMu).pt()] = (*itMu).eta();
       map_muons_phi[(*itMu).pt()] = (*itMu).phi();
       map_muons_energy[(*itMu).pt()] = (*itMu).energy();
+      map_muons_et[(*itMu).pt()] = (*itMu).et();
 
       map_muons_pdgid[(*itMu).pt()] = (*itMu).pdgId();
       map_muons_charge[(*itMu).pt()] = (*itMu).charge();
@@ -477,6 +517,7 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       muons_Py.push_back( map_muons_Py.find(muons_Pt[i])->second );
       muons_Pz.push_back( map_muons_Pz.find(muons_Pt[i])->second );
       muons_energy.push_back( map_muons_energy.find(muons_Pt[i])->second );
+      muons_et.push_back( map_muons_et.find(muons_Pt[i])->second );
       muons_eta.push_back( map_muons_eta.find(muons_Pt[i])->second );
       muons_phi.push_back( map_muons_phi.find(muons_Pt[i])->second );
 
@@ -530,14 +571,130 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 
 
    ////////////////////////////
+   /// Let's find electrons ///
+   ////////////////////////////
+   Handle<ElectronCollection> electrons;
+   iEvent.getByLabel(electronTag, electrons);
+   
+   // fill muon branches
+   for (ElectronCollection::const_iterator itele = electrons->begin() ; itele != electrons->end(); itele++)
+   {
+      electrons_Pt.push_back((*itele).pt());
+
+      map_electrons_eta[(*itele).pt()] = (*itele).eta();
+      map_electrons_phi[(*itele).pt()] = (*itele).phi();
+      map_electrons_energy[(*itele).pt()] = (*itele).energy();   
+      map_electrons_et[(*itele).pt()] = (*itele).et();   
+
+      N_electrons++;
+   }
+                        
+   // Sort Muon Pt in descending order
+   std::sort(electrons_Pt.begin(), electrons_Pt.end(), std::greater<double>());
+   for (unsigned int i=0; i < electrons_Pt.size(); i++)
+   {
+      electrons_energy.push_back( map_electrons_energy.find(electrons_Pt[i])->second );
+      electrons_et.push_back( map_electrons_et.find(electrons_Pt[i])->second );
+      electrons_eta.push_back( map_electrons_eta.find(electrons_Pt[i])->second );
+      electrons_phi.push_back( map_electrons_phi.find(electrons_Pt[i])->second );
+   }
+
+
+
+   ////////////////////////////
    /// Let's find jets      ///
    ////////////////////////////
+
+
+   // Utility for Jet ID
+   //PFJetIDSelectionFunctor JetID(pfJetIDparam);
+   //pat::strbitset looseJetIdSel = JetID.getBitTemplate();
+
    Handle<JetCollection> jets;
    iEvent.getByLabel(jetTag, jets);
    //
    // fill jet branches
    for (JetCollection::const_iterator itJet = jets->begin() ; itJet != jets->end(); itJet++)
    {
+
+      ////////////////////////////////////
+      /// selection of resaonable jets ///
+      ////////////////////////////////////
+      //
+      
+      if ( abs( (*itJet).eta() ) > 2.5 ) {continue;}
+
+      if ( (*itJet).pt() < 20 ) {continue;}
+
+      //
+      jetid_pass = false;
+      jet_isMuon = false;
+      jet_iselectron = false;
+
+      ///For PFJetIDSelectionFunctor
+      //looseJetIdSel.set(false);
+      //jetid_pass = JetID(*itJet, looseJetIdSel);
+ 
+      // Jet ID using my function
+      jetid_pass = recoPFJetID(*itJet, "Loose");
+
+      //cout << jetid_pass << "   " << recoPFJetID(*itJet, "Loose") << endl;
+
+      if (!jetid_pass) {continue;}
+     
+      // let's find funcking muons and electrons which were stored as jets
+      // Muon
+      for (unsigned int j=0;j<N_muons;j++)
+      {
+         dR = deltaR(muons_eta[j], muons_phi[j], (*itJet).eta(), (*itJet).phi());
+         //sqrt( (muons_eta[j]-jets_eta[i])*(muons_eta[j]-jets_eta[i]) + (muons_phi[j]-jets_phi[i])*(muons_phi[j]-jets_phi[i]) );
+         if (dR < 0.5)
+         {
+            //cout << "muon " << muons_eta[j] << "   " << muons_phi[j] << "   " << muons_Pt[j] << endl;
+            //cout << "jet " << (*itJet).eta() << "   " << (*itJet).phi() << "   " << (*itJet).pt() << endl;
+            //if ( (*itJet).energy() - muons_energy[j] < 0 ){
+            //cout << "muon " << muons_phi[j] << "   " << muons_eta[j] << "   " << muons_Pt[j] << "   " << muons_energy[j] << endl; 
+            //cout << "jet " << (*itJet).phi() << "   " << (*itJet).eta() << "   " << (*itJet).pt() << "   " << (*itJet).energy() << endl; 
+            //cout << "jet - muon " << (*itJet).energy() - muons_energy[j] << endl; 
+            //}
+            diff_jetE_muE.push_back( (*itJet).energy() - muons_energy[j] );
+            frac_muE_jetE.push_back( muons_energy[j]/(*itJet).energy() );
+            muPt_inJet.push_back( muons_Pt[j] );
+            if ( muons_energy[j]/(*itJet).energy() > 0.8 )
+            {
+               jet_isMuon = true; 
+               break;
+            }
+         }
+      }
+   
+      if (jet_isMuon) {continue;}
+
+      // electron
+      for (unsigned int k=0;k<N_electrons;k++)
+      {
+         dR = deltaR(electrons_eta[k], electrons_phi[k], (*itJet).eta(), (*itJet).phi());
+        
+         if (dR < 0.5)
+         {
+            //cout << "electron " << electrons_phi[k] << "   " << electrons_eta[k] << "   " << electrons_Pt[k] << "   " << electrons_energy[k] << endl;
+            //cout << "jet " << (*itJet).phi() << "   " << (*itJet).eta() << "   " << (*itJet).pt() << "   " << (*itJet).energy() << endl;
+            //cout << "electron energy fraction " << (*itJet).electronEnergyFraction() << "   " << (*itJet).chargedEmEnergy() << "   " << electrons_Pt[k]/(*itJet).et() << endl; 
+            frac_eleE_jetE.push_back( electrons_energy[k]/(*itJet).energy() );
+            if ( electrons_energy[k]/(*itJet).energy() > 0.95 )
+            {
+               jet_iselectron = true; 
+               break;
+            }
+         }
+      }
+
+      if (jet_iselectron) {continue;}
+      ////////////////////////////
+      /// End of jet selection ///
+      ////////////////////////////
+
+      /// put jet information into ntuple
       jets_Pt.push_back( (*itJet).pt() );
 
       map_jets_Px[(*itJet).pt()] = (*itJet).px();
@@ -577,7 +734,23 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       //     << endl;
    }
 
-
+   /*
+   double dR;
+   /// Jet and muon
+   for (unsigned int i=0;i<NJets;i++)
+   {
+      for (unsigned int j=0;j<N_muons;j++)
+      {
+         dR = deltaR(muons_eta[j], muons_phi[j], jets_eta[i], jets_phi[i]);
+         //sqrt( (muons_eta[j]-jets_eta[i])*(muons_eta[j]-jets_eta[i]) + (muons_phi[j]-jets_phi[i])*(muons_phi[j]-jets_phi[i]) );
+         if (dR < 0.05 && muons_Pt[j] < 15)
+         {
+            cout << "muon " << muons_eta[j] << "   " << muons_phi[j] << "   " << muons_Pt[j] << endl;
+            cout << "jet " << jets_eta[j] << "   " << jets_phi[j] << "   " << jets_Pt[j] << endl;
+         }
+      }
+   }
+   */
 
    /////////////////
    ///Fill ntuple///
@@ -666,6 +839,7 @@ void Identification_Reco::Book()
    MuonID->Branch("muons_Pz", &muons_Pz);
    MuonID->Branch("muons_Pt", &muons_Pt);
    MuonID->Branch("muons_eta", &muons_eta);
+   MuonID->Branch("muons_et", &muons_et);
    MuonID->Branch("muons_phi", &muons_phi);
    MuonID->Branch("muons_pdgid", &muons_pdgid);
    MuonID->Branch("muons_energy", &muons_energy);
@@ -697,6 +871,14 @@ void Identification_Reco::Book()
    MuonID->Branch("muons_isFalseSoft", &muons_isFalseSoft);
    MuonID->Branch("muons_isFalseTight", &muons_isFalseTight);
 
+   // Electron
+   MuonID->Branch("N_electrons", &N_electrons, "N_electrons/I");
+   MuonID->Branch("electrons_Pt", &electrons_Pt);
+   MuonID->Branch("electrons_eta", &electrons_eta);
+   MuonID->Branch("electrons_phi", &electrons_phi);
+   MuonID->Branch("electrons_energy", &electrons_energy);
+   MuonID->Branch("electrons_et", &electrons_et);
+
    // Jet
    MuonID->Branch("NJets", &NJets, "NJets/I");
    MuonID->Branch("jets_Px", &jets_Px);
@@ -712,6 +894,10 @@ void Identification_Reco::Book()
    MuonID->Branch("jets_isPFJet", &jets_isPFJet);
    MuonID->Branch("jets_pdgid", &jets_pdgid);
    MuonID->Branch("jets_isJet", &jets_isJet);
+   MuonID->Branch("diff_jetE_muE", &diff_jetE_muE);
+   MuonID->Branch("frac_muE_jetE", &frac_muE_jetE);
+   MuonID->Branch("muPt_inJet", &muPt_inJet);
+   MuonID->Branch("frac_eleE_jetE", &frac_eleE_jetE);
 
    // Rho
    MuonID->Branch("rho", &rho, "rho/D");
@@ -721,12 +907,16 @@ void Identification_Reco::Book()
 
 void Identification_Reco::Reset()
 {
+   /// Basic event info.
    Event = -333;
    Run = -333;
    Lumi = -333;
    isData = 0;
 
+   /// Primary Vertex
    NPV = 0;
+
+   ///Muon
    N_muons = 0;
    dimuon_inv_mass = -333;
    // vector for muon
@@ -735,6 +925,7 @@ void Identification_Reco::Reset()
    muons_Py.clear();
    muons_Pz.clear();
    muons_eta.clear();
+   muons_et.clear();
    muons_phi.clear();
    muons_energy.clear();
 
@@ -777,6 +968,7 @@ void Identification_Reco::Reset()
    map_muons_Py.clear();
    map_muons_Pz.clear();
    map_muons_eta.clear();
+   map_muons_et.clear();
    map_muons_phi.clear();
    map_muons_pdgid.clear();
    map_muons_energy.clear();
@@ -813,6 +1005,19 @@ void Identification_Reco::Reset()
    map_muons_isFalseSoft.clear();
    map_muons_isFalseTight.clear();
 
+   // electron
+   N_electrons = 0;
+   electrons_Pt.clear();
+   electrons_eta.clear();
+   electrons_phi.clear();
+   electrons_energy.clear();
+   electrons_et.clear();
+   map_electrons_eta.clear();
+   map_electrons_phi.clear();
+   map_electrons_energy.clear();
+   map_electrons_et.clear();
+   
+   /// Jet                      
    NJets = 0;
    rho = 0.;
    //vector for jet
@@ -829,6 +1034,10 @@ void Identification_Reco::Reset()
    jets_isPFJet.clear();
    jets_pdgid.clear();
    jets_isJet.clear();
+   diff_jetE_muE.clear();
+   frac_muE_jetE.clear();
+   frac_eleE_jetE.clear();
+   muPt_inJet.clear();
    //map for jet
    map_jets_Px.clear();
    map_jets_Py.clear();
@@ -865,6 +1074,8 @@ void Identification_Reco::setEffectiveArea()
    EffectiveArea04[2223] = .01;
    EffectiveArea04[2324] = .01;
 }
+
+
 
 double Identification_Reco::getEffectiveArea(double eta, double dr)
 {
@@ -919,6 +1130,47 @@ double Identification_Reco::getEffectiveArea(double eta, double dr)
 
    return EA;
 }
+
+
+
+bool Identification_Reco::recoPFJetID(const reco::PFJet & Jet, string Quality)
+{
+   bool pass = false;
+
+   if (Quality == "Loose")
+   {
+     if ( Jet.numberOfDaughters() > 1 
+         && ( ( Jet.neutralHadronEnergy() + Jet.HFHadronEnergy() ) / Jet.energy() ) < 0.99
+         && Jet.neutralEmEnergyFraction() < 0.99
+         && ( Jet.chargedEmEnergyFraction() < 0.99 || abs(Jet.eta()) > 2.4 )
+         && ( Jet.chargedHadronEnergyFraction() > 0 || abs(Jet.eta()) > 2.4 )
+         && ( Jet.chargedMultiplicity() > 0 || abs(Jet.eta()) > 2.4 )
+        ) {pass = true;}
+
+   } else if (Quality == "Medium") {
+      if ( Jet.numberOfDaughters() > 1
+         && ( ( Jet.neutralHadronEnergy() + Jet.HFHadronEnergy() ) / Jet.energy() ) < 0.95
+         && Jet.neutralEmEnergyFraction() < 0.95
+         && ( Jet.chargedEmEnergyFraction() < 0.99 || abs(Jet.eta()) > 2.4 )
+         && ( Jet.chargedHadronEnergyFraction() > 0 || abs(Jet.eta()) > 2.4 )
+         && ( Jet.chargedMultiplicity() > 0 || abs(Jet.eta()) > 2.4 )
+        ) {pass = true;}
+
+   } else if (Quality == "Tight") {
+      if ( Jet.numberOfDaughters() > 1
+         && ( ( Jet.neutralHadronEnergy() + Jet.HFHadronEnergy() ) / Jet.energy() ) < 0.90
+         && Jet.neutralEmEnergyFraction() < 0.90
+         && ( Jet.chargedEmEnergyFraction() < 0.99 || abs(Jet.eta()) > 2.4 )
+         && ( Jet.chargedHadronEnergyFraction() > 0 || abs(Jet.eta()) > 2.4 )
+         && ( Jet.chargedMultiplicity() > 0 || abs(Jet.eta()) > 2.4 )
+        ) {pass = true;}
+
+   }
+
+   return pass;
+}
+
+
 
 //define this as a plug-in
 DEFINE_FWK_MODULE(Identification_Reco);
