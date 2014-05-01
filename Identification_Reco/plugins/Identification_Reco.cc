@@ -48,6 +48,9 @@
 #include "FWCore/Utilities/interface/Exception.h"
 #include "DataFormats/PatCandidates/interface/Isolation.h"
 #include "DataFormats/Math/interface/deltaR.h"
+// muon ID
+#include "DataFormats/BeamSpot/interface/BeamSpot.h"
+#include "DataFormats/TrackReco/interface/Track.h"
 
 /// Jet ID
 #include "PhysicsTools/SelectorUtils/interface/PFJetIDSelectionFunctor.h"
@@ -67,6 +70,7 @@ class Identification_Reco : public edm::EDAnalyzer {
    typedef std::vector<reco::GsfElectron> ElectronCollection;
    //typedef std::vector<reco::Jet> JetCollection;
    typedef std::vector<reco::PFJet> JetCollection;
+   typedef reco::BeamSpot beamSpot;
 
    public:
       explicit Identification_Reco(const edm::ParameterSet&);
@@ -99,6 +103,7 @@ class Identification_Reco : public edm::EDAnalyzer {
       // TFileService
       edm::Service<TFileService> muisofs;
       //Input Tag
+      edm::InputTag beamspotTag;
       edm::InputTag vertexTag;
       edm::InputTag muonTag;
       edm::InputTag electronTag;
@@ -147,6 +152,16 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::vector<bool> muons_isHighPt;
       std::vector<bool> muons_isFalseSoft;
       std::vector<bool> muons_isFalseTight;
+      // muon id
+      std::vector<bool> muons_isPF;
+      std::vector<bool> muons_isGlobal;
+      std::vector<double> muons_globalTrack_normChi2;
+      std::vector<int> muons_globalTrack_NValidMuonHits;
+      std::vector<int> muons_NMatchedStations;
+      std::vector<int> muons_innerTrack_trackerLayersWithMeasurement;
+      std::vector<int> muons_innerTrack_NValidPixelHits;
+      std::vector<double> muons_BestTrack_dxy;
+      std::vector<double> muons_BestTrack_dz;
       //To sort objects in Pt order.
       std::map<double, double> map_muons_Px;
       std::map<double, double> map_muons_Py;
@@ -183,6 +198,16 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::map<double, bool> map_muons_isHighPt;
       std::map<double, bool> map_muons_isFalseSoft;
       std::map<double, bool> map_muons_isFalseTight;
+      // muon id
+      std::map<double, bool> map_muons_isPF;
+      std::map<double, bool> map_muons_isGlobal;
+      std::map<double, double> map_muons_globalTrack_normChi2;
+      std::map<double, int> map_muons_globalTrack_NValidMuonHits;
+      std::map<double, int> map_muons_NMatchedStations;
+      std::map<double, int> map_muons_innerTrack_trackerLayersWithMeasurement;
+      std::map<double, int> map_muons_innerTrack_NValidPixelHits;
+      std::map<double, double> map_muons_BestTrack_dxy;
+      std::map<double, double> map_muons_BestTrack_dz;
 
       // Electron variable containers
       std::vector<double> electrons_Pt;
@@ -230,7 +255,11 @@ class Identification_Reco : public edm::EDAnalyzer {
 
       ///Vertex
       std::vector<double> vtx_sumptsquare;
+      std::vector<double> vtx_rho;
+      std::vector<double> vtx_z;
       std::map<double, reco::Vertex> map_vtx_sumptsquare;
+      std::map<double, double> map_vtx_rho;
+      std::map<double, double> map_vtx_z;
 
       // Effective Area
       std::map<unsigned int, double> EffectiveArea03;
@@ -267,6 +296,18 @@ class Identification_Reco : public edm::EDAnalyzer {
       double PFIsorho04;
       double effA03;
       double effA04;
+      double mu_vtx_dxy;
+      double mu_vtx_dz;
+      //muon id
+      bool _isGlobal;
+      bool _isPF;
+      double _globalTrack_normChi2;
+      int _globalTrack_NValidMuonHits;
+      int _NMatchedStations;
+      int _innerTrack_trackerLayersWithMeasurement;
+      int _innerTrack_NValidPixelHits;
+      double _BestTrack_dxy;
+      double _BestTrack_dz;
 
       // Electron
       unsigned int N_electrons;
@@ -278,6 +319,11 @@ class Identification_Reco : public edm::EDAnalyzer {
       unsigned int NJets;
       double rho;
       double dR;
+
+      // Beam Spot
+      double beamSpot_x;
+      double beamSpot_y;
+      double beamSpot_z;
 
       //Vertex
       double sumtrackptsquare;
@@ -295,7 +341,8 @@ class Identification_Reco : public edm::EDAnalyzer {
 // constructors and destructor
 //
 Identification_Reco::Identification_Reco(const edm::ParameterSet& iConfig)
-:vertexTag( iConfig.getParameter<edm::InputTag>("pvTag") ),
+:beamspotTag( iConfig.getParameter<edm::InputTag>("bsTag") ),
+ vertexTag( iConfig.getParameter<edm::InputTag>("pvTag") ),
  muonTag( iConfig.getParameter<edm::InputTag>("muTag") ),
  electronTag( iConfig.getParameter<edm::InputTag>("eTag") ),
  jetTag( iConfig.getParameter<edm::InputTag>("jtTag") ),
@@ -335,7 +382,15 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
    isData = iEvent.isRealData();
    //cout << isData << "   " << EVENT << "   " << RUN << "   " << LUMI << endl;
 
-   //To read Reco format
+   // Beam Spot
+   Handle<beamSpot> BS;
+   iEvent.getByLabel(beamspotTag, BS);
+   //cout << (*BS).position() << "   " << (*BS).position().x() << "   " << (*BS).x0() << "   " << (*BS).y0() << "   " << (*BS).z0() << endl;
+   beamSpot_x = (*BS).position().x();
+   beamSpot_y = (*BS).position().y();
+   beamSpot_z = (*BS).position().z();
+
+   //Find Primary Vertices
    Handle<VertexCollection> vertices;
    iEvent.getByLabel(vertexTag, vertices);
    for (VertexCollection::const_iterator itPV = vertices->begin(); itPV != vertices->end(); itPV++)
@@ -352,6 +407,8 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 
          vtx_sumptsquare.push_back(sumtrackptsquare);
          map_vtx_sumptsquare[sumtrackptsquare] = *itPV;
+         map_vtx_rho[sumtrackptsquare] = (*itPV).position().Rho();
+         map_vtx_z[sumtrackptsquare] = (*itPV).z();
 
          NPV++;
          //cout << itPV->position().Rho() << endl;
@@ -360,12 +417,14 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 
    //cout << NPV << endl;
    std::sort(vtx_sumptsquare.begin(), vtx_sumptsquare.end(), std::greater<double>());
-   /*
+   
    for (unsigned int i=0; i < vtx_sumptsquare.size(); i++)
    {
-      cout << map_vtx_sumptsquare.find(vtx_sumptsquare[i])->second.ndof() << "   " << vtx_sumptsquare[i] << endl;
+      //cout << map_vtx_sumptsquare.find(vtx_sumptsquare[i])->second.ndof() << "   " << vtx_sumptsquare[i] << endl;
+      vtx_rho.push_back( map_vtx_rho.find(vtx_sumptsquare[i])->second );
+      vtx_z.push_back( map_vtx_z.find(vtx_sumptsquare[i])->second );
    }
-   */
+   
 
    //////////////////////
    ///       Rho      ///
@@ -395,6 +454,19 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       isFalseSoft = false;
       isFalseTight = false;
 
+      _isGlobal = false;
+      _isPF = false;
+      _globalTrack_normChi2 = -333.;
+      _globalTrack_NValidMuonHits = -333;
+      _NMatchedStations = -333;
+      _innerTrack_trackerLayersWithMeasurement = -333;
+      _innerTrack_NValidPixelHits = -333;
+      _BestTrack_dxy = -333333.;
+      _BestTrack_dz = -333333.;
+
+      mu_vtx_dxy = -333;
+      mu_vtx_dz = -333;
+
       // isLooseMuon ?
       /*
       if ( (*itMu).isPFMuon() && ( (*itMu).isGlobalMuon() || (*itMu).isTrackerMuon() ) )
@@ -406,18 +478,31 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       */
       isLoose = muon::isLooseMuon( (*itMu) );
       //cout << "isLoose " << isLoose << "   " << muon::isLooseMuon((*itMu)) << endl;
-      
-      // isSoftMuon ?
-      isSoft = muon::isSoftMuon( (*itMu), map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second );
-      //cout << "isSoft " << isSoft << endl;
+   
+      if (NPV == 0)
+      {   
+         // isSoftMuon ?
+         isSoft = muon::isSoftMuonWithBS( (*itMu), (*BS) );
 
-      // isTightMuon ?
-      isTight = muon::isTightMuon( (*itMu), map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second );
-      //cout << "isTight " << isTight << endl;
+         // isTightMuon ?
+         isTight = muon::isTightMuonWithBS( (*itMu), (*BS) );
      
-      // isHighPtMuon ?
-      isHighPt = muon::isHighPtMuon( (*itMu), map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second );
-      //cout << "isHighPt " << isHighPt << endl;
+         // isHighPtMuon ?
+         isHighPt = muon::isHighPtMuonWithBS( (*itMu), (*BS) );
+          
+      } else {
+         // isSoftMuon ?
+         isSoft = muon::isSoftMuon( (*itMu), map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second );
+         //cout << "isSoft " << isSoft << endl;
+
+         // isTightMuon ?
+         isTight = muon::isTightMuon( (*itMu), map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second );
+         //cout << "isTight " << isTight << endl;
+     
+         // isHighPtMuon ?
+         isHighPt = muon::isHighPtMuon( (*itMu), map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second );
+         //cout << "isHighPt " << isHighPt << endl;
+      }
 
       // For sanity check
       if (isLoose == 0 && isSoft == 1)
@@ -435,6 +520,56 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       }
 
       //cout << muon::isGoodMuon((*itMu), TMOneStationTight) << "    " << TMOneStationTight << endl;
+
+      // Muon ID
+      //cout << (*itMu).isGlobalMuon() << "   " << (*itMu).isPFMuon() << endl;
+      /*
+      if (!(*itMu).globalTrack().isNull())
+      {
+         cout << (*itMu).globalTrack()->normalizedChi2() << "   " << (*itMu).globalTrack()->hitPattern().numberOfValidMuonHits() << endl;
+      }
+      */
+      //cout << (*itMu).numberOfMatchedStations() << "   " << (*itMu).innerTrack()->hitPattern().trackerLayersWithMeasurement() << "   "
+      //     << (*itMu).innerTrack()->hitPattern().numberOfValidPixelHits() << endl;
+      //cout << (*itMu).muonBestTrack()->dxy(map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second.position()) << "   " 
+      //     << (*itMu).muonBestTrack()->dz(map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second.position()) << endl;
+      //cout << (*itMu).muonBestTrack()->dxy((*BS).position()) << "   " 
+      //     << (*itMu).muonBestTrack()->dz((*BS).position()) << endl;
+      _isGlobal = (*itMu).isGlobalMuon();
+      _isPF = (*itMu).isPFMuon();
+      _NMatchedStations = (*itMu).numberOfMatchedStations();
+      if (!(*itMu).globalTrack().isNull())
+      {
+         _globalTrack_normChi2 = (*itMu).globalTrack()->normalizedChi2();
+         _globalTrack_NValidMuonHits = (*itMu).globalTrack()->hitPattern().numberOfValidMuonHits();
+      }
+      if (!(*itMu).innerTrack().isNull())
+      {
+         _innerTrack_trackerLayersWithMeasurement = (*itMu).innerTrack()->hitPattern().trackerLayersWithMeasurement();
+         _innerTrack_NValidPixelHits = (*itMu).innerTrack()->hitPattern().numberOfValidPixelHits();
+      }
+      if (!(*itMu).muonBestTrack().isNull())
+      {
+         if (NPV == 0)
+         {
+            _BestTrack_dxy = (*itMu).muonBestTrack()->dxy((*BS).position());
+            _BestTrack_dz = (*itMu).muonBestTrack()->dz((*BS).position());
+
+         } else {
+            _BestTrack_dxy = (*itMu).muonBestTrack()->dxy(map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second.position());
+            _BestTrack_dz = (*itMu).muonBestTrack()->dz(map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second.position());
+
+         }
+      }
+      map_muons_isGlobal[(*itMu).pt()] = _isGlobal;
+      map_muons_isPF[(*itMu).pt()] = _isPF;
+      map_muons_globalTrack_normChi2[(*itMu).pt()] = _globalTrack_normChi2;
+      map_muons_globalTrack_NValidMuonHits[(*itMu).pt()] = _globalTrack_NValidMuonHits;
+      map_muons_NMatchedStations[(*itMu).pt()] = _NMatchedStations;
+      map_muons_innerTrack_trackerLayersWithMeasurement[(*itMu).pt()] = _innerTrack_trackerLayersWithMeasurement;
+      map_muons_innerTrack_NValidPixelHits[(*itMu).pt()] = _innerTrack_NValidPixelHits;
+      map_muons_BestTrack_dxy[(*itMu).pt()] = _BestTrack_dxy;
+      map_muons_BestTrack_dz[(*itMu).pt()] = _BestTrack_dz;
 
       map_muons_isLoose[(*itMu).pt()] = isLoose;
       map_muons_isSoft[(*itMu).pt()] = isSoft;
@@ -554,6 +689,17 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       muons_isHighPt.push_back( map_muons_isHighPt.find(muons_Pt[i])->second );
       muons_isFalseSoft.push_back( map_muons_isFalseSoft.find(muons_Pt[i])->second );
       muons_isFalseTight.push_back( map_muons_isFalseTight.find(muons_Pt[i])->second );
+
+      // Muon ID
+      muons_isGlobal.push_back( map_muons_isGlobal.find(muons_Pt[i])->second );
+      muons_isPF.push_back( map_muons_isPF.find(muons_Pt[i])->second );
+      muons_globalTrack_normChi2.push_back( map_muons_globalTrack_normChi2.find(muons_Pt[i])->second );
+      muons_globalTrack_NValidMuonHits.push_back( map_muons_globalTrack_NValidMuonHits.find(muons_Pt[i])->second );
+      muons_NMatchedStations.push_back( map_muons_NMatchedStations.find(muons_Pt[i])->second );
+      muons_innerTrack_trackerLayersWithMeasurement.push_back( map_muons_innerTrack_trackerLayersWithMeasurement.find(muons_Pt[i])->second );
+      muons_innerTrack_NValidPixelHits.push_back( map_muons_innerTrack_NValidPixelHits.find(muons_Pt[i])->second );
+      muons_BestTrack_dxy.push_back( map_muons_BestTrack_dxy.find(muons_Pt[i])->second );
+      muons_BestTrack_dz.push_back( map_muons_BestTrack_dz.find(muons_Pt[i])->second );
 
       //cout << i << "   " << muons_Pt[i] << "   " << muons_Px[i] 
       //     << map_muons_isTight.find(muons_Pt[i])->second <<"   "
@@ -680,7 +826,7 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             //cout << "electron " << electrons_phi[k] << "   " << electrons_eta[k] << "   " << electrons_Pt[k] << "   " << electrons_energy[k] << endl;
             //cout << "jet " << (*itJet).phi() << "   " << (*itJet).eta() << "   " << (*itJet).pt() << "   " << (*itJet).energy() << endl;
             //cout << "electron energy fraction " << (*itJet).electronEnergyFraction() << "   " << (*itJet).chargedEmEnergy() << "   " << electrons_Pt[k]/(*itJet).et() << endl; 
-            frac_eleE_jetE.push_back( electrons_energy[k]/(*itJet).energy() );
+           // frac_eleE_jetE.push_back( electrons_energy[k]/(*itJet).energy() );
             if ( electrons_energy[k]/(*itJet).energy() > 0.95 )
             {
                jet_iselectron = true; 
@@ -827,9 +973,16 @@ void Identification_Reco::Book()
    MuonID->Branch("Lumi", &Lumi, "Lumi/I");
    MuonID->Branch("isData", &isData, "isData/O");
 
+   // Beam Position
+   MuonID->Branch("beamSpot_x", &beamSpot_x,"beamSpot_x/D");
+   MuonID->Branch("beamSpot_y", &beamSpot_y,"beamSpot_y/D");
+   MuonID->Branch("beamSpot_z", &beamSpot_z,"beamSpot_z/D");
+
    // Vertex
    MuonID->Branch("NPV", &NPV, "NPV/I");
    MuonID->Branch("vtx_sumptsquare", &vtx_sumptsquare);
+   MuonID->Branch("vtx_rho", &vtx_rho);
+   MuonID->Branch("vtx_z", &vtx_z);
 
    // Muon
    MuonID->Branch("N_muons", &N_muons, "N_muons/I");
@@ -870,6 +1023,18 @@ void Identification_Reco::Book()
    MuonID->Branch("muons_isHighPt", &muons_isHighPt);
    MuonID->Branch("muons_isFalseSoft", &muons_isFalseSoft);
    MuonID->Branch("muons_isFalseTight", &muons_isFalseTight);
+   MuonID->Branch("mu_vtx_dxy", &mu_vtx_dxy, "mu_vtx_dxy/D");
+   MuonID->Branch("mu_vtx_dz", &mu_vtx_dz, "mu_vtx_dz/D");
+   // Muon ID
+   MuonID->Branch("muons_isGlobal", &muons_isGlobal);
+   MuonID->Branch("muons_isPF", &muons_isPF);
+   MuonID->Branch("muons_globalTrack_normChi2", &muons_globalTrack_normChi2);
+   MuonID->Branch("muons_globalTrack_NValidMuonHits", &muons_globalTrack_NValidMuonHits);
+   MuonID->Branch("muons_NMatchedStations", &muons_NMatchedStations);
+   MuonID->Branch("muons_innerTrack_trackerLayersWithMeasurement", &muons_innerTrack_trackerLayersWithMeasurement);
+   MuonID->Branch("muons_innerTrack_NValidPixelHits", &muons_innerTrack_NValidPixelHits);
+   MuonID->Branch("muons_BestTrack_dxy", &muons_BestTrack_dxy);
+   MuonID->Branch("muons_BestTrack_dz", &muons_BestTrack_dz);
 
    // Electron
    MuonID->Branch("N_electrons", &N_electrons, "N_electrons/I");
@@ -912,6 +1077,11 @@ void Identification_Reco::Reset()
    Run = -333;
    Lumi = -333;
    isData = 0;
+
+   /// Beam Spot
+   beamSpot_x = -333333.;
+   beamSpot_y = -333333.;
+   beamSpot_z = -333333.;
 
    /// Primary Vertex
    NPV = 0;
@@ -963,6 +1133,16 @@ void Identification_Reco::Reset()
    muons_isFalseSoft.clear();
    muons_isFalseTight.clear();
 
+   muons_isGlobal.clear();
+   muons_isPF.clear();
+   muons_globalTrack_normChi2.clear();
+   muons_globalTrack_NValidMuonHits.clear();
+   muons_NMatchedStations.clear();
+   muons_innerTrack_trackerLayersWithMeasurement.clear();
+   muons_innerTrack_NValidPixelHits.clear();
+   muons_BestTrack_dxy.clear();
+   muons_BestTrack_dz.clear();
+
    // map for muon
    map_muons_Px.clear();
    map_muons_Py.clear();
@@ -1004,6 +1184,16 @@ void Identification_Reco::Reset()
    map_muons_isHighPt.clear();
    map_muons_isFalseSoft.clear();
    map_muons_isFalseTight.clear();
+ 
+   map_muons_isGlobal.clear();
+   map_muons_isPF.clear();
+   map_muons_globalTrack_normChi2.clear();
+   map_muons_globalTrack_NValidMuonHits.clear();
+   map_muons_NMatchedStations.clear();
+   map_muons_innerTrack_trackerLayersWithMeasurement.clear();
+   map_muons_innerTrack_NValidPixelHits.clear();   
+   map_muons_BestTrack_dxy.clear();
+   map_muons_BestTrack_dz.clear();
 
    // electron
    N_electrons = 0;
@@ -1054,7 +1244,11 @@ void Identification_Reco::Reset()
 
    //Vertex
    vtx_sumptsquare.clear();
+   vtx_rho.clear();
+   vtx_z.clear();
    map_vtx_sumptsquare.clear();
+   map_vtx_rho.clear();
+   map_vtx_z.clear();
 }
 
 
