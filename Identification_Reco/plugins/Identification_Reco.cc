@@ -42,7 +42,10 @@
 
 /// ROOT
 #include "TTree.h"
-    
+
+//
+#include "DataFormats/HepMCCandidate/interface/GenParticle.h"
+#include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"    
 #include "DataFormats/MuonReco/interface/MuonIsolation.h"
 #include "DataFormats/MuonReco/interface/MuonSelectors.h"
 #include "FWCore/Utilities/interface/Exception.h"
@@ -65,6 +68,7 @@ using namespace muon;
 
 class Identification_Reco : public edm::EDAnalyzer {
 
+   typedef std::vector<reco::GenParticle> GenParticleCollection;
    typedef std::vector<reco::Vertex> VertexCollection;
    typedef std::vector<reco::Muon> MuonCollection;
    typedef std::vector<reco::GsfElectron> ElectronCollection;
@@ -103,6 +107,7 @@ class Identification_Reco : public edm::EDAnalyzer {
       // TFileService
       edm::Service<TFileService> muisofs;
       //Input Tag
+      edm::InputTag genParInfoTag;
       edm::InputTag beamspotTag;
       edm::InputTag vertexTag;
       edm::InputTag muonTag;
@@ -115,6 +120,20 @@ class Identification_Reco : public edm::EDAnalyzer {
 
       TTree* MuonID;
 
+      // Generator information
+      std::vector<int> genPar_pdgId;
+      std::vector<double> genPar_pt;
+      std::vector<double> genPar_eta;
+      std::vector<double> genPar_phi;
+      std::vector<double> genPar_px;
+      std::vector<double> genPar_py;
+      std::vector<double> genPar_pz;
+      std::vector<double> genPar_energy;
+      std::vector<int> genPar_charge;
+      std::vector<int> genPar_status;
+      std::vector<int> genPar_mother_pdgId;
+      std::vector<bool> genPar_NoMother;
+      
       // muon variable containers
       std::vector<double> muons_Px;
       std::vector<double> muons_Py;
@@ -125,6 +144,9 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::vector<double> muons_pdgid;
       std::vector<double> muons_et;
       std::vector<double> muons_energy;
+      std::vector<double> muons_energy_dep_em;
+      std::vector<double> muons_energy_dep_had;
+      std::vector<double> muons_energy_dep_ho;
       std::vector<double> muons_charge;
       std::vector<double> muons_trkIso03;
       std::vector<double> muons_caloIso03;
@@ -155,6 +177,10 @@ class Identification_Reco : public edm::EDAnalyzer {
       // muon id
       std::vector<bool> muons_isPF;
       std::vector<bool> muons_isGlobal;
+      std::vector<bool> muons_isThereGlobalTrk;
+      std::vector<bool> muons_isThereMuonBestTrk;
+      std::vector<bool> muons_isThereInnerTrk;
+      std::vector<bool> muons_isThereOuterTrk;
       std::vector<double> muons_globalTrack_normChi2;
       std::vector<int> muons_globalTrack_NValidMuonHits;
       std::vector<int> muons_NMatchedStations;
@@ -162,6 +188,12 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::vector<int> muons_innerTrack_NValidPixelHits;
       std::vector<double> muons_BestTrack_dxy;
       std::vector<double> muons_BestTrack_dz;
+      std::vector<double> muons_InnerTrk_pt;
+      std::vector<double> muons_InnerTrk_eta;
+      std::vector<double> muons_InnerTrk_phi;
+      std::vector<double> muons_OuterTrk_pt;
+      std::vector<double> muons_OuterTrk_eta;
+      std::vector<double> muons_OuterTrk_phi;
       //To sort objects in Pt order.
       std::map<double, double> map_muons_Px;
       std::map<double, double> map_muons_Py;
@@ -171,6 +203,9 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::map<double, double> map_muons_pdgid;
       std::map<double, double> map_muons_et;
       std::map<double, double> map_muons_energy;
+      std::map<double, double> map_muons_energy_dep_em;
+      std::map<double, double> map_muons_energy_dep_had;
+      std::map<double, double> map_muons_energy_dep_ho;
       std::map<double, double> map_muons_charge;
       std::map<double, double> map_muons_trkIso03;
       std::map<double, double> map_muons_caloIso03;
@@ -201,6 +236,10 @@ class Identification_Reco : public edm::EDAnalyzer {
       // muon id
       std::map<double, bool> map_muons_isPF;
       std::map<double, bool> map_muons_isGlobal;
+      std::map<double, bool> map_muons_isThereGlobalTrk;
+      std::map<double, bool> map_muons_isThereMuonBestTrk;
+      std::map<double, bool> map_muons_isThereInnerTrk;
+      std::map<double, bool> map_muons_isThereOuterTrk;
       std::map<double, double> map_muons_globalTrack_normChi2;
       std::map<double, int> map_muons_globalTrack_NValidMuonHits;
       std::map<double, int> map_muons_NMatchedStations;
@@ -208,6 +247,12 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::map<double, int> map_muons_innerTrack_NValidPixelHits;
       std::map<double, double> map_muons_BestTrack_dxy;
       std::map<double, double> map_muons_BestTrack_dz;
+      std::map<double, double> map_muons_InnerTrk_pt;
+      std::map<double, double> map_muons_InnerTrk_eta;
+      std::map<double, double> map_muons_InnerTrk_phi;
+      std::map<double, double> map_muons_OuterTrk_pt;
+      std::map<double, double> map_muons_OuterTrk_eta;
+      std::map<double, double> map_muons_OuterTrk_phi;
 
       // Electron variable containers
       std::vector<double> electrons_Pt;
@@ -274,6 +319,9 @@ class Identification_Reco : public edm::EDAnalyzer {
       int Lumi;
       bool isData;
 
+      /// Generator information
+      int N_genPar;
+
       /// Muon
       unsigned int NPV;
       unsigned int N_muons;
@@ -301,6 +349,10 @@ class Identification_Reco : public edm::EDAnalyzer {
       //muon id
       bool _isGlobal;
       bool _isPF;
+      bool _isThereGlobalTrk;
+      bool _isThereMuonBestTrk;
+      bool _isThereInnerTrk;
+      bool _isThereOuterTrk;
       double _globalTrack_normChi2;
       int _globalTrack_NValidMuonHits;
       int _NMatchedStations;
@@ -308,6 +360,12 @@ class Identification_Reco : public edm::EDAnalyzer {
       int _innerTrack_NValidPixelHits;
       double _BestTrack_dxy;
       double _BestTrack_dz;
+      double _inner_trk_pt;
+      double _inner_trk_eta;
+      double _inner_trk_phi;
+      double _outer_trk_pt;
+      double _outer_trk_eta;
+      double _outer_trk_phi;
 
       // Electron
       unsigned int N_electrons;
@@ -341,7 +399,8 @@ class Identification_Reco : public edm::EDAnalyzer {
 // constructors and destructor
 //
 Identification_Reco::Identification_Reco(const edm::ParameterSet& iConfig)
-:beamspotTag( iConfig.getParameter<edm::InputTag>("bsTag") ),
+:genParInfoTag( iConfig.getParameter<edm::InputTag>("genParTag") ),
+ beamspotTag( iConfig.getParameter<edm::InputTag>("bsTag") ),
  vertexTag( iConfig.getParameter<edm::InputTag>("pvTag") ),
  muonTag( iConfig.getParameter<edm::InputTag>("muTag") ),
  electronTag( iConfig.getParameter<edm::InputTag>("eTag") ),
@@ -381,6 +440,53 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
    Lumi = iEvent.id().luminosityBlock();
    isData = iEvent.isRealData();
    //cout << isData << "   " << EVENT << "   " << RUN << "   " << LUMI << endl;
+
+   // Generator Particle Information
+   Handle<GenParticleCollection> genParticles;
+   iEvent.getByLabel(genParInfoTag, genParticles);
+   for ( GenParticleCollection::const_iterator itGenPar = genParticles->begin(); itGenPar != genParticles->end(); itGenPar++ )
+   {
+      /*
+      cout << (*itGenPar).pdgId() << "   " << (*itGenPar).pt() << "   " << (*itGenPar).eta()  
+           << (*itGenPar).phi() << "   " << (*itGenPar).px() << "   " << (*itGenPar).py() << "   "  
+           << (*itGenPar).pz() << "   " << (*itGenPar).charge() << "    " << (*itGenPar).status() << "   "
+           << (*itGenPar).energy() << "   " << (*itGenPar).numberOfMothers() << endl;
+      */
+      /*
+      int n_mothers = (*itGenPar).numberOfMothers();
+      for(int j = 0; j < n_mothers; j++) 
+      {
+         const Candidate * mom = (*itGenPar).mother( j );
+         int momId = mom->pdgId();
+         cout << momId << endl;
+      }
+      */
+
+      genPar_pdgId.push_back( (*itGenPar).pdgId() );
+      genPar_pt.push_back( (*itGenPar).pt() );
+      genPar_eta.push_back( (*itGenPar).eta() );
+      genPar_phi.push_back( (*itGenPar).phi() );
+      genPar_px.push_back( (*itGenPar).px() );
+      genPar_py.push_back( (*itGenPar).py() );
+      genPar_pz.push_back( (*itGenPar).pz() );
+      genPar_energy.push_back( (*itGenPar).energy() );
+      genPar_charge.push_back( (*itGenPar).charge() );
+      genPar_status.push_back( (*itGenPar).status() );
+
+      if ( (*itGenPar).numberOfMothers() == 0)
+      {
+         genPar_mother_pdgId.push_back( (*itGenPar).pdgId() );
+         genPar_NoMother.push_back(true);
+
+      } else {
+         const Candidate *mom = (*itGenPar).mother(0);
+         genPar_mother_pdgId.push_back( mom->pdgId() );
+         genPar_NoMother.push_back(false);
+
+      }
+
+      N_genPar++;
+   }
 
    // Beam Spot
    Handle<beamSpot> BS;
@@ -456,6 +562,10 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 
       _isGlobal = false;
       _isPF = false;
+      _isThereGlobalTrk = false;
+      _isThereMuonBestTrk = false;
+      _isThereInnerTrk = false;
+      _isThereOuterTrk = false;
       _globalTrack_normChi2 = -333.;
       _globalTrack_NValidMuonHits = -333;
       _NMatchedStations = -333;
@@ -463,6 +573,12 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       _innerTrack_NValidPixelHits = -333;
       _BestTrack_dxy = -333333.;
       _BestTrack_dz = -333333.;
+      _inner_trk_pt = -333333.;
+      _inner_trk_eta = -333333.;
+      _inner_trk_phi = -333333.;
+      _outer_trk_pt = -333333.;
+      _outer_trk_eta = -333333.;
+      _outer_trk_phi = -333333.;
 
       mu_vtx_dxy = -333;
       mu_vtx_dz = -333;
@@ -540,16 +656,13 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       _NMatchedStations = (*itMu).numberOfMatchedStations();
       if (!(*itMu).globalTrack().isNull())
       {
+         _isThereGlobalTrk = true;
          _globalTrack_normChi2 = (*itMu).globalTrack()->normalizedChi2();
          _globalTrack_NValidMuonHits = (*itMu).globalTrack()->hitPattern().numberOfValidMuonHits();
       }
-      if (!(*itMu).innerTrack().isNull())
-      {
-         _innerTrack_trackerLayersWithMeasurement = (*itMu).innerTrack()->hitPattern().trackerLayersWithMeasurement();
-         _innerTrack_NValidPixelHits = (*itMu).innerTrack()->hitPattern().numberOfValidPixelHits();
-      }
       if (!(*itMu).muonBestTrack().isNull())
       {
+         _isThereMuonBestTrk = true;
          if (NPV == 0)
          {
             _BestTrack_dxy = (*itMu).muonBestTrack()->dxy((*BS).position());
@@ -561,8 +674,28 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 
          }
       }
+      if (!(*itMu).innerTrack().isNull())
+      {
+         _isThereInnerTrk = true;
+         _innerTrack_trackerLayersWithMeasurement = (*itMu).innerTrack()->hitPattern().trackerLayersWithMeasurement();
+         _innerTrack_NValidPixelHits = (*itMu).innerTrack()->hitPattern().numberOfValidPixelHits();
+         _inner_trk_pt = (*itMu).innerTrack()->pt();
+         _inner_trk_eta = (*itMu).innerTrack()->eta();
+         _inner_trk_phi = (*itMu).innerTrack()->phi();
+      }
+      if (!(*itMu).outerTrack().isNull())
+      {
+         _isThereOuterTrk = true;
+         _outer_trk_pt = (*itMu).outerTrack()->pt();
+         _outer_trk_eta = (*itMu).outerTrack()->eta();
+         _outer_trk_phi = (*itMu).outerTrack()->phi();
+      }
       map_muons_isGlobal[(*itMu).pt()] = _isGlobal;
       map_muons_isPF[(*itMu).pt()] = _isPF;
+      map_muons_isThereGlobalTrk[(*itMu).pt()] = _isThereGlobalTrk;
+      map_muons_isThereMuonBestTrk[(*itMu).pt()] = _isThereMuonBestTrk;
+      map_muons_isThereInnerTrk[(*itMu).pt()] = _isThereInnerTrk;
+      map_muons_isThereOuterTrk[(*itMu).pt()] = _isThereOuterTrk;
       map_muons_globalTrack_normChi2[(*itMu).pt()] = _globalTrack_normChi2;
       map_muons_globalTrack_NValidMuonHits[(*itMu).pt()] = _globalTrack_NValidMuonHits;
       map_muons_NMatchedStations[(*itMu).pt()] = _NMatchedStations;
@@ -570,6 +703,12 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       map_muons_innerTrack_NValidPixelHits[(*itMu).pt()] = _innerTrack_NValidPixelHits;
       map_muons_BestTrack_dxy[(*itMu).pt()] = _BestTrack_dxy;
       map_muons_BestTrack_dz[(*itMu).pt()] = _BestTrack_dz;
+      map_muons_InnerTrk_pt[(*itMu).pt()] = _inner_trk_pt;
+      map_muons_InnerTrk_eta[(*itMu).pt()] = _inner_trk_eta;
+      map_muons_InnerTrk_phi[(*itMu).pt()] = _inner_trk_phi;
+      map_muons_OuterTrk_pt[(*itMu).pt()] = _outer_trk_pt;
+      map_muons_OuterTrk_eta[(*itMu).pt()] = _outer_trk_eta;
+      map_muons_OuterTrk_phi[(*itMu).pt()] = _outer_trk_phi;
 
       map_muons_isLoose[(*itMu).pt()] = isLoose;
       map_muons_isSoft[(*itMu).pt()] = isSoft;
@@ -641,6 +780,11 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
               / (*itMu).pt();
       map_muons_PFIsorho04[(*itMu).pt()] = PFIsorho04;
 
+      //cout << (*itMu).calEnergy().em << "   " << (*itMu).calEnergy().had << "   " << (*itMu).calEnergy().ho << endl;
+      map_muons_energy_dep_em[(*itMu).pt()] = (*itMu).calEnergy().em;
+      map_muons_energy_dep_had[(*itMu).pt()] = (*itMu).calEnergy().had;
+      map_muons_energy_dep_ho[(*itMu).pt()] = (*itMu).calEnergy().ho;
+
       N_muons++;
    }
 
@@ -652,6 +796,9 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       muons_Py.push_back( map_muons_Py.find(muons_Pt[i])->second );
       muons_Pz.push_back( map_muons_Pz.find(muons_Pt[i])->second );
       muons_energy.push_back( map_muons_energy.find(muons_Pt[i])->second );
+      muons_energy_dep_em.push_back( map_muons_energy_dep_em.find(muons_Pt[i])->second );
+      muons_energy_dep_had.push_back( map_muons_energy_dep_had.find(muons_Pt[i])->second );
+      muons_energy_dep_ho.push_back( map_muons_energy_dep_ho.find(muons_Pt[i])->second );
       muons_et.push_back( map_muons_et.find(muons_Pt[i])->second );
       muons_eta.push_back( map_muons_eta.find(muons_Pt[i])->second );
       muons_phi.push_back( map_muons_phi.find(muons_Pt[i])->second );
@@ -693,6 +840,10 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       // Muon ID
       muons_isGlobal.push_back( map_muons_isGlobal.find(muons_Pt[i])->second );
       muons_isPF.push_back( map_muons_isPF.find(muons_Pt[i])->second );
+      muons_isThereGlobalTrk.push_back( map_muons_isThereGlobalTrk.find(muons_Pt[i])->second );
+      muons_isThereMuonBestTrk.push_back( map_muons_isThereMuonBestTrk.find(muons_Pt[i])->second );
+      muons_isThereInnerTrk.push_back( map_muons_isThereInnerTrk.find(muons_Pt[i])->second );
+      muons_isThereOuterTrk.push_back( map_muons_isThereOuterTrk.find(muons_Pt[i])->second );
       muons_globalTrack_normChi2.push_back( map_muons_globalTrack_normChi2.find(muons_Pt[i])->second );
       muons_globalTrack_NValidMuonHits.push_back( map_muons_globalTrack_NValidMuonHits.find(muons_Pt[i])->second );
       muons_NMatchedStations.push_back( map_muons_NMatchedStations.find(muons_Pt[i])->second );
@@ -700,6 +851,12 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       muons_innerTrack_NValidPixelHits.push_back( map_muons_innerTrack_NValidPixelHits.find(muons_Pt[i])->second );
       muons_BestTrack_dxy.push_back( map_muons_BestTrack_dxy.find(muons_Pt[i])->second );
       muons_BestTrack_dz.push_back( map_muons_BestTrack_dz.find(muons_Pt[i])->second );
+      muons_InnerTrk_pt.push_back( map_muons_InnerTrk_pt.find(muons_Pt[i])->second );
+      muons_InnerTrk_eta.push_back( map_muons_InnerTrk_eta.find(muons_Pt[i])->second );
+      muons_InnerTrk_phi.push_back( map_muons_InnerTrk_phi.find(muons_Pt[i])->second );
+      muons_OuterTrk_pt.push_back( map_muons_OuterTrk_pt.find(muons_Pt[i])->second );
+      muons_OuterTrk_eta.push_back( map_muons_OuterTrk_eta.find(muons_Pt[i])->second );
+      muons_OuterTrk_phi.push_back( map_muons_OuterTrk_phi.find(muons_Pt[i])->second );
 
       //cout << i << "   " << muons_Pt[i] << "   " << muons_Px[i] 
       //     << map_muons_isTight.find(muons_Pt[i])->second <<"   "
@@ -973,6 +1130,21 @@ void Identification_Reco::Book()
    MuonID->Branch("Lumi", &Lumi, "Lumi/I");
    MuonID->Branch("isData", &isData, "isData/O");
 
+   // Generator information
+   MuonID->Branch("N_genPar", &N_genPar, "N_genPar/I");
+   MuonID->Branch("genPar_pdgId", &genPar_pdgId);
+   MuonID->Branch("genPar_pt", &genPar_pt);
+   MuonID->Branch("genPar_eta", &genPar_eta);
+   MuonID->Branch("genPar_phi", &genPar_phi);
+   MuonID->Branch("genPar_px", &genPar_px);
+   MuonID->Branch("genPar_py", &genPar_py);
+   MuonID->Branch("genPar_pz", &genPar_pz);
+   MuonID->Branch("genPar_energy", &genPar_energy);
+   MuonID->Branch("genPar_charge", &genPar_charge);
+   MuonID->Branch("genPar_mother_pdgId", &genPar_mother_pdgId);
+   MuonID->Branch("genPar_NoMother", &genPar_NoMother);
+   MuonID->Branch("genPar_status", &genPar_status);
+
    // Beam Position
    MuonID->Branch("beamSpot_x", &beamSpot_x,"beamSpot_x/D");
    MuonID->Branch("beamSpot_y", &beamSpot_y,"beamSpot_y/D");
@@ -996,6 +1168,9 @@ void Identification_Reco::Book()
    MuonID->Branch("muons_phi", &muons_phi);
    MuonID->Branch("muons_pdgid", &muons_pdgid);
    MuonID->Branch("muons_energy", &muons_energy);
+   MuonID->Branch("muons_energy_dep_em", &muons_energy_dep_em);
+   MuonID->Branch("muons_energy_dep_had", &muons_energy_dep_had);
+   MuonID->Branch("muons_energy_dep_ho", &muons_energy_dep_ho);
    MuonID->Branch("muons_charge", &muons_charge);
    MuonID->Branch("muons_trkIso03", &muons_trkIso03);
    MuonID->Branch("muons_caloIso03", &muons_caloIso03);
@@ -1028,6 +1203,10 @@ void Identification_Reco::Book()
    // Muon ID
    MuonID->Branch("muons_isGlobal", &muons_isGlobal);
    MuonID->Branch("muons_isPF", &muons_isPF);
+   MuonID->Branch("muons_isThereGlobalTrk", &muons_isThereGlobalTrk);
+   MuonID->Branch("muons_isThereMuonBestTrk", &muons_isThereMuonBestTrk);
+   MuonID->Branch("muons_isThereInnerTrk", &muons_isThereInnerTrk);
+   MuonID->Branch("muons_isThereOuterTrk", &muons_isThereOuterTrk);
    MuonID->Branch("muons_globalTrack_normChi2", &muons_globalTrack_normChi2);
    MuonID->Branch("muons_globalTrack_NValidMuonHits", &muons_globalTrack_NValidMuonHits);
    MuonID->Branch("muons_NMatchedStations", &muons_NMatchedStations);
@@ -1035,6 +1214,12 @@ void Identification_Reco::Book()
    MuonID->Branch("muons_innerTrack_NValidPixelHits", &muons_innerTrack_NValidPixelHits);
    MuonID->Branch("muons_BestTrack_dxy", &muons_BestTrack_dxy);
    MuonID->Branch("muons_BestTrack_dz", &muons_BestTrack_dz);
+   MuonID->Branch("muons_InnerTrk_pt", &muons_InnerTrk_pt);
+   MuonID->Branch("muons_InnerTrk_eta", &muons_InnerTrk_eta);
+   MuonID->Branch("muons_InnerTrk_phi", &muons_InnerTrk_phi);
+   MuonID->Branch("muons_OuterTrk_pt", &muons_OuterTrk_pt);
+   MuonID->Branch("muons_OuterTrk_eta", &muons_OuterTrk_eta);
+   MuonID->Branch("muons_OuterTrk_phi", &muons_OuterTrk_phi);
 
    // Electron
    MuonID->Branch("N_electrons", &N_electrons, "N_electrons/I");
@@ -1078,6 +1263,22 @@ void Identification_Reco::Reset()
    Lumi = -333;
    isData = 0;
 
+   /// Generator information
+   N_genPar = 0;
+   // vector for generator particles
+   genPar_pdgId.clear();
+   genPar_pt.clear();
+   genPar_eta.clear();
+   genPar_phi.clear();
+   genPar_px.clear();
+   genPar_py.clear();
+   genPar_pz.clear();
+   genPar_energy.clear();
+   genPar_charge.clear();
+   genPar_mother_pdgId.clear();
+   genPar_status.clear();
+   genPar_NoMother.clear();
+
    /// Beam Spot
    beamSpot_x = -333333.;
    beamSpot_y = -333333.;
@@ -1098,6 +1299,9 @@ void Identification_Reco::Reset()
    muons_et.clear();
    muons_phi.clear();
    muons_energy.clear();
+   muons_energy_dep_em.clear();
+   muons_energy_dep_had.clear();
+   muons_energy_dep_ho.clear();
 
    muons_pdgid.clear();
    muons_charge.clear();
@@ -1135,6 +1339,10 @@ void Identification_Reco::Reset()
 
    muons_isGlobal.clear();
    muons_isPF.clear();
+   muons_isThereGlobalTrk.clear();
+   muons_isThereMuonBestTrk.clear();
+   muons_isThereInnerTrk.clear();
+   muons_isThereOuterTrk.clear();
    muons_globalTrack_normChi2.clear();
    muons_globalTrack_NValidMuonHits.clear();
    muons_NMatchedStations.clear();
@@ -1142,6 +1350,12 @@ void Identification_Reco::Reset()
    muons_innerTrack_NValidPixelHits.clear();
    muons_BestTrack_dxy.clear();
    muons_BestTrack_dz.clear();
+   muons_InnerTrk_pt.clear();
+   muons_InnerTrk_eta.clear();
+   muons_InnerTrk_phi.clear();
+   muons_OuterTrk_pt.clear();
+   muons_OuterTrk_eta.clear();
+   muons_OuterTrk_phi.clear();
 
    // map for muon
    map_muons_Px.clear();
@@ -1152,6 +1366,9 @@ void Identification_Reco::Reset()
    map_muons_phi.clear();
    map_muons_pdgid.clear();
    map_muons_energy.clear();
+   map_muons_energy_dep_em.clear();
+   map_muons_energy_dep_had.clear();
+   map_muons_energy_dep_ho.clear();
    map_muons_charge.clear();
 
    map_muons_trkIso03.clear();
@@ -1187,6 +1404,10 @@ void Identification_Reco::Reset()
  
    map_muons_isGlobal.clear();
    map_muons_isPF.clear();
+   map_muons_isThereGlobalTrk.clear();
+   map_muons_isThereMuonBestTrk.clear();
+   map_muons_isThereInnerTrk.clear();
+   map_muons_isThereOuterTrk.clear();
    map_muons_globalTrack_normChi2.clear();
    map_muons_globalTrack_NValidMuonHits.clear();
    map_muons_NMatchedStations.clear();
@@ -1194,6 +1415,12 @@ void Identification_Reco::Reset()
    map_muons_innerTrack_NValidPixelHits.clear();   
    map_muons_BestTrack_dxy.clear();
    map_muons_BestTrack_dz.clear();
+   map_muons_InnerTrk_pt.clear();
+   map_muons_InnerTrk_eta.clear();
+   map_muons_InnerTrk_phi.clear();
+   map_muons_OuterTrk_pt.clear();
+   map_muons_OuterTrk_eta.clear();
+   map_muons_OuterTrk_phi.clear();
 
    // electron
    N_electrons = 0;
