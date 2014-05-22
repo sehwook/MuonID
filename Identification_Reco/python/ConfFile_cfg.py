@@ -28,6 +28,7 @@ process.TFileService = cms.Service("TFileService",
 )
 
 process.muonid = cms.EDAnalyzer('Identification_Reco',
+                              pileupTag = cms.InputTag("addPileupInfo",""),
                               genParTag = cms.InputTag("genParticles",""),
                               bsTag = cms.InputTag("offlineBeamSpot",""),
                               pvTag = cms.InputTag("offlinePrimaryVertices",""),
