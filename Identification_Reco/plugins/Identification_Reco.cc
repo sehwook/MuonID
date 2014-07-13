@@ -136,6 +136,9 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::vector<int> genPar_status;
       std::vector<int> genPar_mother_pdgId;
       std::vector<bool> genPar_NoMother;
+      std::vector<double> genPar_vx;
+      std::vector<double> genPar_vy;
+      std::vector<double> genPar_vz;
       
       // muon variable containers
       std::vector<double> muons_Px;
@@ -178,6 +181,7 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::vector<bool> muons_isFalseSoft;
       std::vector<bool> muons_isFalseTight;
       // muon id
+      std::vector<bool> muons_isMuon;
       std::vector<bool> muons_isPF;
       std::vector<bool> muons_isGlobal;
       std::vector<bool> muons_isTracker;
@@ -201,6 +205,9 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::vector<double> muons_OuterTrk_pt;
       std::vector<double> muons_OuterTrk_eta;
       std::vector<double> muons_OuterTrk_phi;
+      std::vector<double> muons_vx;
+      std::vector<double> muons_vy;
+      std::vector<double> muons_vz;
       //To sort objects in Pt order.
       std::map<double, double> map_muons_Px;
       std::map<double, double> map_muons_Py;
@@ -241,6 +248,7 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::map<double, bool> map_muons_isFalseSoft;
       std::map<double, bool> map_muons_isFalseTight;
       // muon id
+      std::map<double, bool> map_muons_isMuon;
       std::map<double, bool> map_muons_isPF;
       std::map<double, bool> map_muons_isGlobal;
       std::map<double, bool> map_muons_isTracker;
@@ -264,6 +272,9 @@ class Identification_Reco : public edm::EDAnalyzer {
       std::map<double, double> map_muons_OuterTrk_pt;
       std::map<double, double> map_muons_OuterTrk_eta;
       std::map<double, double> map_muons_OuterTrk_phi;
+      std::map<double, double> map_muons_vx;
+      std::map<double, double> map_muons_vy;
+      std::map<double, double> map_muons_vz;
 
       // Electron variable containers
       std::vector<double> electrons_Pt;
@@ -363,6 +374,7 @@ class Identification_Reco : public edm::EDAnalyzer {
       double mu_vtx_dxy;
       double mu_vtx_dz;
       //muon id
+      bool _isMuon;
       bool _isGlobal;
       bool _isPF;
       bool _isTracker;
@@ -493,6 +505,9 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       genPar_energy.push_back( (*itGenPar).energy() );
       genPar_charge.push_back( (*itGenPar).charge() );
       genPar_status.push_back( (*itGenPar).status() );
+      genPar_vx.push_back( (*itGenPar).vx() );
+      genPar_vy.push_back( (*itGenPar).vy() );
+      genPar_vz.push_back( (*itGenPar).vz() );
 
       if ( (*itGenPar).numberOfMothers() == 0)
       {
@@ -538,8 +553,8 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
    iEvent.getByLabel(vertexTag, vertices);
    for (VertexCollection::const_iterator itPV = vertices->begin(); itPV != vertices->end(); itPV++)
    {
-      //if ( !itPV->isFake() && itPV->ndof() > 4.0 && itPV->position().Rho() < 2. && abs(itPV->z()) < 24. )
-      if ( !itPV->isFake() && itPV->ndof() > 4.0 )
+      if ( !itPV->isFake() && itPV->ndof() > 4.0 && itPV->position().Rho() < 2. && abs(itPV->z()) < 24. )
+      //if ( !itPV->isFake() && itPV->ndof() > 4.0 )
       {
          sumtrackptsquare = 0;
          for(reco::Vertex::trackRef_iterator trkItr = itPV->tracks_begin(); trkItr != itPV->tracks_end(); ++trkItr)
@@ -597,6 +612,7 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       isFalseSoft = false;
       isFalseTight = false;
 
+      _isMuon = false;
       _isGlobal = false;
       _isPF = false;   
       _isTracker = false;
@@ -692,6 +708,7 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       //     << (*itMu).muonBestTrack()->dz(map_vtx_sumptsquare.find(vtx_sumptsquare[0])->second.position()) << endl;
       //cout << (*itMu).muonBestTrack()->dxy((*BS).position()) << "   " 
       //     << (*itMu).muonBestTrack()->dz((*BS).position()) << endl;
+      _isMuon = (*itMu).isMuon();
       _isGlobal = (*itMu).isGlobalMuon();
       _isPF = (*itMu).isPFMuon();
       _isTracker = (*itMu).isTrackerMuon();
@@ -735,6 +752,7 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
          _outer_trk_eta = (*itMu).outerTrack()->eta();
          _outer_trk_phi = (*itMu).outerTrack()->phi();
       }
+      map_muons_isMuon[(*itMu).pt()] = _isMuon;
       map_muons_isGlobal[(*itMu).pt()] = _isGlobal;
       map_muons_isPF[(*itMu).pt()] = _isPF;
       map_muons_isTracker[(*itMu).pt()] = _isTracker;
@@ -783,6 +801,10 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       map_muons_phi[(*itMu).pt()] = (*itMu).phi();
       map_muons_energy[(*itMu).pt()] = (*itMu).energy();
       map_muons_et[(*itMu).pt()] = (*itMu).et();
+
+      map_muons_vx[(*itMu).pt()] = (*itMu).vx();
+      map_muons_vy[(*itMu).pt()] = (*itMu).vy();
+      map_muons_vz[(*itMu).pt()] = (*itMu).vz();
 
       map_muons_pdgid[(*itMu).pt()] = (*itMu).pdgId();
       map_muons_charge[(*itMu).pt()] = (*itMu).charge();
@@ -852,6 +874,10 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       muons_eta.push_back( map_muons_eta.find(muons_Pt[i])->second );
       muons_phi.push_back( map_muons_phi.find(muons_Pt[i])->second );
 
+      muons_vx.push_back( map_muons_vx.find(muons_Pt[i])->second );
+      muons_vy.push_back( map_muons_vy.find(muons_Pt[i])->second );
+      muons_vz.push_back( map_muons_vz.find(muons_Pt[i])->second );
+
       muons_pdgid.push_back( map_muons_pdgid.find(muons_Pt[i])->second );
       muons_charge.push_back( map_muons_charge.find(muons_Pt[i])->second );
 
@@ -887,6 +913,7 @@ Identification_Reco::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
       muons_isFalseTight.push_back( map_muons_isFalseTight.find(muons_Pt[i])->second );
 
       // Muon ID
+      muons_isMuon.push_back( map_muons_isMuon.find(muons_Pt[i])->second );
       muons_isGlobal.push_back( map_muons_isGlobal.find(muons_Pt[i])->second );
       muons_isTracker.push_back( map_muons_isTracker.find(muons_Pt[i])->second );
       muons_isStandAlone.push_back( map_muons_isStandAlone.find(muons_Pt[i])->second );
@@ -1192,6 +1219,9 @@ void Identification_Reco::Book()
    MuonID->Branch("genPar_px", &genPar_px);
    MuonID->Branch("genPar_py", &genPar_py);
    MuonID->Branch("genPar_pz", &genPar_pz);
+   MuonID->Branch("genPar_vx", &genPar_vx);
+   MuonID->Branch("genPar_vy", &genPar_vy);
+   MuonID->Branch("genPar_vz", &genPar_vz);
    MuonID->Branch("genPar_energy", &genPar_energy);
    MuonID->Branch("genPar_charge", &genPar_charge);
    MuonID->Branch("genPar_mother_pdgId", &genPar_mother_pdgId);
@@ -1220,6 +1250,9 @@ void Identification_Reco::Book()
    MuonID->Branch("muons_Px", &muons_Px);
    MuonID->Branch("muons_Py", &muons_Py);
    MuonID->Branch("muons_Pz", &muons_Pz);
+   MuonID->Branch("muons_vx", &muons_vx);
+   MuonID->Branch("muons_vy", &muons_vy);
+   MuonID->Branch("muons_vz", &muons_vz);
    MuonID->Branch("muons_Pt", &muons_Pt);
    MuonID->Branch("muons_eta", &muons_eta);
    MuonID->Branch("muons_et", &muons_et);
@@ -1259,6 +1292,7 @@ void Identification_Reco::Book()
    MuonID->Branch("mu_vtx_dxy", &mu_vtx_dxy, "mu_vtx_dxy/D");
    MuonID->Branch("mu_vtx_dz", &mu_vtx_dz, "mu_vtx_dz/D");
    // Muon ID
+   MuonID->Branch("muons_isMuon", &muons_isMuon);
    MuonID->Branch("muons_isGlobal", &muons_isGlobal);
    MuonID->Branch("muons_isTracker", &muons_isTracker);
    MuonID->Branch("muons_isStandAlone", &muons_isStandAlone);
@@ -1335,6 +1369,9 @@ void Identification_Reco::Reset()
    genPar_px.clear();
    genPar_py.clear();
    genPar_pz.clear();
+   genPar_vx.clear();
+   genPar_vy.clear();
+   genPar_vz.clear();
    genPar_energy.clear();
    genPar_charge.clear();
    genPar_mother_pdgId.clear();
@@ -1357,6 +1394,9 @@ void Identification_Reco::Reset()
    muons_Px.clear();
    muons_Py.clear();
    muons_Pz.clear();
+   muons_vx.clear();
+   muons_vy.clear();
+   muons_vz.clear();
    muons_eta.clear();
    muons_et.clear();
    muons_phi.clear();
@@ -1399,6 +1439,7 @@ void Identification_Reco::Reset()
    muons_isFalseSoft.clear();
    muons_isFalseTight.clear();
 
+   muons_isMuon.clear();
    muons_isGlobal.clear();
    muons_isTracker.clear();
    muons_isStandAlone.clear();
@@ -1427,6 +1468,9 @@ void Identification_Reco::Reset()
    map_muons_Px.clear();
    map_muons_Py.clear();
    map_muons_Pz.clear();
+   map_muons_vx.clear();
+   map_muons_vy.clear();
+   map_muons_vz.clear();
    map_muons_eta.clear();
    map_muons_et.clear();
    map_muons_phi.clear();
@@ -1468,6 +1512,7 @@ void Identification_Reco::Reset()
    map_muons_isFalseSoft.clear();
    map_muons_isFalseTight.clear();
  
+   map_muons_isMuon.clear();
    map_muons_isGlobal.clear();
    map_muons_isTracker.clear();
    map_muons_isStandAlone.clear();
